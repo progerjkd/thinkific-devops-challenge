@@ -1,0 +1,83 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:11.5
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    ports:
+      - 5432:5432
+  web:
+    build: .
+    volumes:
+      - .:/app
+    ports:
+      - 3000:3000
+    depends_on:
+      - db
+      - fluent-bit
+    logging:
+      driver: fluentd
+  nginx:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.nginx
+    ports:
+      - 8080:8080
+      - 443:443
+    depends_on:
+      - web
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus-data:/prometheus
+    command: --web.enable-lifecycle  --config.file=/etc/prometheus/prometheus.yml
+    depends_on:
+      - web
+  grafana:
+    image: grafana/grafana:7.5.7
+    ports:
+      - 3500:3500/tcp
+    environment:
+      - GF_SERVER_HTTP_PORT=3500
+    restart:
+      unless-stopped
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+  fluent-bit:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.fluent-bit
+    ports:
+      - 24224:24224
+      - 24224:24224/udp
+    depends_on:
+      - elasticsearch
+  elasticsearch:
+    image: elasticsearch:7.3.0
+    ports:
+      - 9200:9200
+      - 9300:9300
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+  kibana:
+      image: kibana:7.3.0
+      ports:
+        - 5602:5601
+      environment:
+        ELASTICSEARCH_URL: http://elasticsearch:9200
+        ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      depends_on:
+        - elasticsearch
+volumes:
+  postgres-data:
+  prometheus-data:
+  grafana-data:

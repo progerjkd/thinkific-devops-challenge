@@ -1,0 +1,11 @@
+FROM nginx:latest
+
+COPY reverse-proxy.conf /etc/nginx/conf.d/reverse-proxy.conf
+COPY certs/nginx-selfsigned.crt /etc/ssl/certs/
+COPY certs/nginx-selfsigned.key /etc/ssl/private/
+
+EXPOSE 8080
+EXPOSE 433
+STOPSIGNAL SIGTERM
+
+CMD ["nginx", "-g", "daemon off;"]
